@@ -19,15 +19,15 @@ jobs:
         include:
           - arch: aarch64_cortex-a53
             target: mvebu-cortexa53
-            runtime_test: true
+            runtime_test: false
 
           - arch: aarch64_cortex-a72
             target: mvebu-cortexa72
             runtime_test: false
 
           - arch: aarch64_generic
-            target: rockchip-armv8
-            runtime_test: false
+            target: armsr-armv8
+            runtime_test: true
 
           - arch: arm_cortex-a7_neon-vfpv4
             target: ipq40xx-generic
@@ -38,7 +38,7 @@ jobs:
             runtime_test: false
 
           - arch: arm_cortex-a15_neon-vfpv4
-            target: armvirt-32
+            target: armsr-armv7
             runtime_test: true
 
           - arch: i386_pentium4
@@ -51,10 +51,14 @@ jobs:
 
           - arch: mips_24kc
             target: ath79-generic
-            runtime_test: false
+            runtime_test: true
 
           - arch: mipsel_24kc
             target: mt7621
+            runtime_test: false
+
+          - arch: riscv64_riscv64
+            target: sifiveu-generic
             runtime_test: false
 
           - arch: x86_64
@@ -62,29 +66,30 @@ jobs:
             runtime_test: true
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
       - name: Build
-        uses: openwrt/gh-action-sdk@v3
+        uses: openwrt/gh-action-sdk@v7
         env:
-          ARCH: ${{ matrix.arch }}-master
+          ARCH: ${{ matrix.arch }}
           FEEDNAME: packages_ci
           PACKAGES: cdnspeedtest
+          V: s
 
       - name: Move created packages to project dir
         run: cp bin/packages/${{ matrix.arch }}/packages_ci/*.ipk . || true
 
       - name: Store packages
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         if: github.event_name != 'release'
         with:
           name: ${{ matrix.arch}}-${{ github.sha}}-packages
           path: "*.ipk"
 
       - name: Store logs
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: ${{ matrix.arch}}-${{ github.sha}}-logs
           path: logs/
@@ -104,7 +109,9 @@ jobs:
       - name: Register QEMU
         if: ${{ matrix.runtime_test }}
         run: |
-          sudo docker run --rm --privileged aptman/qus -s -- -p
+          sudo apt-get update
+          sudo apt-get install -y qemu-user-static binfmt-support
+          sudo update-binfmts --import
 
       - name: Build Docker container
         if: ${{ matrix.runtime_test }}
